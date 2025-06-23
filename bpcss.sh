@@ -4,7 +4,7 @@
 
 set -e
 
-# Configuration: set your GitHub repo URL containing bpcss.py and related files
+# Configuration: GitHub repo URL containing bpcss.py and related files
 REPO_URL="https://github.com/yourusername/bpcss-toolkit.git"
 # Directory where toolkit will be installed
 TOOLKIT_DIR="$HOME/.bpcss_toolkit"
