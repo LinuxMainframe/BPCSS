@@ -1,38 +1,73 @@
 # BioPhysics Computation Server System (BPCSS)
 
-**BPCSS** is a reproducible and modular pipeline designed for academic molecular dynamics (MD) simulations using all-atom models. It supports protein structure preparation, loop modeling, minimization, equilibration, and production-level simulations.
+**BPCSS** is a reproducible, modular, and interactive pipeline for academic all-atom molecular dynamics (MD) simulations and structure preparation. It streamlines protein cleanup, loop modeling, validation, and integration with downstream tools (e.g., GROMACS, CHARMM-GUI) via Python automation. Originally designed for GPCRs (e.g., 5-HT₂A receptor, PDB: 6A94), it is extensible to other membrane proteins, ligand-bound receptors, and complexes.
 
-This workflow integrates:
-- **GROMACS** – for high-performance MD simulation
-- **CHARMM-GUI** – for system setup and membrane insertion
-- **PDB-Tools Web** – for structure cleanup
-- **DaReUS-Loop** – for loop modeling and structure repair
-- **Python 3 + Scientific Packages** – for automation, batch processing, and analysis
-
-> Originally developed for GPCRs such as **5-HT₂A receptor (PDB: 6A94)**, BPCSS is easily extensible to related membrane proteins, ligand-bound receptors, and protein complexes.
+---
 
 ## ✨ Key Features
 
-- 🔬 Structural refinement and loop modeling
-- ⚛️ Equilibration and validation of protein-ligand systems
-- 🧬 End-to-end automation with reproducible configuration
-- 📈 Longitudinal simulation-ready for signal cascade studies
-- 🔧 Adaptable to various protein types and use cases
+- **Interactive REPL** with commands:
+  - `show` / `info`: display saved system information
+  - `clear`: clear the terminal screen
+  - `pp`: launch the protein preparation sub-module
+  - `help` / `?`: list available commands
+  - `exit` / `quit`: exit the toolkit
+- **System information gathering**:
+  - CPU, RAM, OS details, GPU detection (NVIDIA/AMD), PATH checks, GROMACS (`gmx`) availability, CUDA toolkit presence, CPU flags analysis, etc.
+  - Detects changes between runs and prompts user on how to handle them.
+- **Protein preparation workflow** (`pp`):
+  1. **Input choice**: local PDB file or fetch from RCSB by PDB ID.
+  2. **Parsing & cleanup**:
+     - List chains and HETATM entities.
+     - Detect numbering discontinuities.
+     - Detect missing residues via comparison of SEQRES vs ATOM records.
+     - Interactive selection of chains and ligands/ions to keep (e.g., zinc, cofactors).
+     - Save cleaned PDB under `modules/prepared_proteins/<PDBID>/<PDBID>_cleaned.pdb`, with overwrite checks.
+     - Display a small embedded 3D view (via `py3Dmol`) in browser for visual validation.
+  3. **Scoring** before modeling:
+     - Simple “quality” score (0–100) based on missing residues and discontinuities.
+  4. **Loop modeling & structure repair**:
+     - If missing residues detected:
+       - **PyRosetta-based** loop modeling (KIC mover), with repeated decoy attempts:
+         - Strips heteroatoms for modeling.
+         - User supplies full sequence (one-letter) matching SEQRES (excluding ligands).
+         - Generates a specified number of successful decoys (up to max attempts), each with:
+           - Loop insertion via KIC.
+           - Light relaxation (FastRelax) to relieve clashes.
+           - Rosetta energy scoring.
+           - Optional **Modeller DOPE** scoring (if MODELLER installed): average chain DOPE score.
+           - Combined score = Rosetta energy + weight · DOPE (e.g., 0.1×DOPE).
+         - Chooses best decoy by combined score.
+         - Saves modeled loops PDB (`<PDBID>_cleaned_modeled.pdb`).
+       - **Merging**: reinserts coordinates of modeled loops back into the cleaned PDB (to retain HETATM such as zinc), producing `<PDBID>_cleaned_merged.pdb`.
+       - If fewer than requested decoys succeed, proceeds with available best.
+       - Catches and logs errors (e.g., loop application failures, relax failures, DOPE scoring failures) and continues attempts.
+       - If PyRosetta not available or KIC mover unavailable, falls back to manual editing prompt.
+  5. **Post-modeling scoring**:
+     - Re-score the merged structure against original SEQRES to report “score after modeling & merge”.
+  6. **Renumbering**:
+     - Interactive prompt: “Renumber residues contiguously starting at 1? [Y/n]”
+     - Always uses the merged PDB when available, so final PDB is `<PDBID>_cleaned_merged_renum.pdb`.
+     - Overwrite checks to avoid accidental data loss.
+  7. **Final score & output**:
+     - Final quality score (0–100) printed.
+     - Location of final PDB shown (e.g., `modules/prepared_proteins/6A94/6A94_cleaned_merged_renum.pdb`).
+- **Integration with external tools**:
+  - **GROMACS**: later steps (not in this module) will rely on knowing `gmx` availability and hardware capabilities.
+  - **CHARMM-GUI**: wrapper logic can open a browser instance from Python for automated upload/setup.
+  - **Modeller**: if installed, DOPE scoring of Rosetta-modeled decoys is integrated.
+  - **PyRosetta**: for loop modeling, relaxation, energy scoring.
+- **Security & privacy**:
+  - No personally identifiable information is stored.
+  - System info stored locally under `~/.bpcss/system_info.json`; user can inspect or delete as needed.
+- **Reproducibility**:
+  - All cleaned/modeling outputs saved under versioned filenames with prompts to avoid overwrites.
+  - JSON logging of system environment to detect changes over runs.
 
-## 🧪 Use Cases
+---
 
-- GPCR and membrane protein simulations  
-- Binding pocket dynamics and ligand studies  
-- Comparative modeling of protein variants  
-- In silico validation of homology models
+## 📥 Installation & Requirements
 
-## 📄 License
-
-This project is licensed under the [MIT License](LICENSE). Please cite this repository or associated publication if used in academic work.
-
-## 🧠 Citation
-
-If you use this workflow in your research, please cite:
-
-> Your Name, *et al.* BioPhysics Computation Server System (BPCSS): A modular pipeline for MD simulation and protein-ligand modeling. **Journal Name**, Year.
-
+1. **Clone repository** (or install via provided `bpcss.sh` installer):
+   ```bash
+   git clone https://github.com/yourusername/bpcss-toolkit.git ~/.bpcss_toolkit
